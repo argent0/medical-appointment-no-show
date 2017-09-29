@@ -9,7 +9,7 @@ require("knitr")
 
 ## Loading the data
 
-```{r load_data}
+```{r load_data, cache=TRUE}
 appData <-
 	read.csv(
 		 unz("data/noshowappointments.zip", "KaggleV2-May-2016.csv"),
@@ -20,7 +20,7 @@ appData <-
 
 **Wait**: the number of days from the scheduling date to the appointment date.
 
-```{r compute_wait}
+```{r compute_wait, cache=TRUE}
 schedDay <- const (
 	sapply(X = (appData$ScheduledDay %>% as.character %>% strsplit("T")),
 	       FUN=`[[`, 1) %>%
@@ -102,62 +102,42 @@ title(main="Lower wait times have worse assitence.")
 
 **Distribution of Neighbourhoods**
 
-```{r hist_neighbourhood, fig.height=10}
+```{r hist_neighbourhood, fig.height=10, cache=TRUE}
 tbl_neigh <- table(appData$No.show, appData$Neighbourhood)
 par(mfrow=c(2,1))
 barplot(tbl_neigh, col=c(2,4),
 	ylab="Count", xlab="Neighbourhood")
-legend(x=0,y=-5000, title="Showed up?", fill=c(2,4),
+legend("topleft", title="Showed up?", fill=c(2,4),
        legend=levels(appData$No.show), cex=0.7, xpd=TRUE)
 barplot(tbl_neigh %>% prop.table(2), col=c(2,4),
 	ylab="Proportion", xlab="Neighbourhood")
+title(main="Most location have the same assistance rate")
 ```
 
 **Distribution of other categorical variables**
 
-```{r hists_categorical_variables, results="hide"}
-par("mar"=par("mar")*0.5)
+```{r hists_categorical_variables, results="hide", fig.height=20}
+#par("mar"=par("mar")*1.71)
 par(oma = c(0,0,2,0))
-layout(matrix(c(1,2,3,4,5,6,7,7,7),nrow = 3,ncol = 3,byrow = TRUE),
-       heights = c(0.39,0.39,0.22))
-mapply(FUN=function(column,varname) {
-	table(appData$No.show, column) %>%
-	barplot(xlab=varname, ylab="Count", col=c(2,4))
-},appData[,8:13], names(appData)[8:13])
+layout(matrix(c(1,1,seq(2,13)),nrow = 7,ncol = 2,byrow = TRUE))
+       #,heights = c(0.39,0.39,0.22))
 plot(1, type = "n", axes=FALSE, xlab="", ylab="")
-legend("top", inset=0, title="Legend",
+legend("bottom", inset=0, title="Legend",
        pch=c(15,15,21), col=c(2,4),
        legend=c("No Show", "Yes Show"),
        , horiz=TRUE)
+title(main="Histogram/Composition", sub="Sending SMS is helpful")
 
-mtext("Distributions of other categorical variables.", outer = TRUE, cex = 1.5)
+mapply(FUN=function(column,varname) {
+	tbl_var <- table(appData$No.show, column)
+	barplot(tbl_var, xlab=varname, ylab="Count", col=c(2,4))
+	barplot(prop.table(tbl_var,2), xlab=varname,
+				 ylab="Proportion", col=c(2,4))
+},appData[,8:13], names(appData)[8:13])
+
 ```
 
 ## Relation of variables to No.show
-
-**No.show vs other categorical variables**
-
-```{r categorical_variables_vs_no_show, results="hide"}
-par("mar"=par("mar")*0.5)
-par(oma = c(0,0,2,0))
-layout(matrix(c(1,2,3,4,5,6,7,7,7),nrow = 3,ncol = 3,byrow = TRUE), heights =
-       c(0.39,0.39,0.22))
-mapply(FUN=function(column,varname) {
-	tbl_var <- table(appData$No.show, column)
-	count_var <- table(column)
-	middle_points <- barplot(prop.table(tbl_var,2), xlab=varname,
-				 ylab="Proportion", col=c(2,4))
-	points(middle_points, rep(0.3, length(middle_points)), pch=21,
-	       bg="white", cex=10*sqrt(count_var/max(count_var)))
-},appData[,8:13], names(appData)[8:13])
-plot(1, type = "n", axes=FALSE, xlab="", ylab="")
-legend("top", inset=0, title="Legend",
-       pch=c(15,15,21), col=c(2,4,1),
-       legend=c("No Show", "Yes Show", "Subsample size"),
-       , horiz=TRUE)
-
-mtext("SMS_received improves the assistance.", outer = TRUE, cex = 1.5)
-```
 
 **Did the patient showed up for its previous appointment**
 
