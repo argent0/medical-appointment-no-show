@@ -87,13 +87,17 @@ barplot(table(appData$No.show, cut(appData$Age, hist_age$breaks)) %>% prop.table
 hist_wait <-hist(appData$Wait)
 ```
 
-```{r hist_wait_2}
+```{r hist_wait_2, fig.height=10}
+par(mfrow=c(2,1))
 tbl_wait <- table(appData$No.show, cut(appData$Wait, hist_wait$breaks,
 				       include.lowest=TRUE))
 barplot(tbl_wait, xlab="Wait Bracket", ylab="count", col=c(2,4))
 legend("topright", title="Showed up?", fill=c(2,4),
        legend=levels(appData$No.show))
 title("Histogram of Wait")
+barplot(tbl_wait %>% prop.table(2), xlab="Wait",
+			 ylab="Proportion of No.show", col=c(2,4))
+title(main="Lower wait times have worse assitence.")
 ```
 
 **Distribution of Neighbourhoods**
@@ -154,24 +158,6 @@ legend("top", inset=0, title="Legend",
 
 mtext("SMS_received improves the assistance.", outer = TRUE, cex = 1.5)
 ```
-
-**No.show vs wait**
-
-```{r no_show_vs_wait }
-.default_paramenters = par(no.readonly = TRUE)
-par(mar=par("mar") + c(0,0,0,7))
-middle_points <- barplot(tbl_wait %>% prop.table(2), xlab="Wait",
-			 ylab="Proportion of No.show", col=c(2,4))
-points(middle_points, rep(0.2, length(middle_points)), pch=21, bg="white",
-       cex=12*sqrt(hist_wait$counts/max(hist_wait$counts)))
-legend(x=24,y=0.6, title="Legend",
-       pch=c(15,15,21), col=c(2,4,1),
-       legend=c("Didn't show", "Showed up", "Bracket size"), xpd=TRUE)
-title(main="Lower wait times have worse assitence.")
-par(.default_paramenters)
-```
-
-The areas of the circles are proportional to the amount of data in the bracket.
 
 **Did the patient showed up for its previous appointment**
 
