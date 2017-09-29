@@ -145,19 +145,6 @@ legend(x=30,y=0.6, title="Showed up?", fill=c(2,4),
 par(.default_paramenters)
 ```
 
-**No.show vs gender**
-
-```{r no_show_by_gender}
-par(mar=par("mar")+c(0,0,0,5))
-middle_points <- tbl_gender %>% prop.table(2) %>% 
-	barplot(xlab="Gender", ylab="Proportion", col=c(2,4))
-points(middle_points, rep(0.2, length(middle_points)), pch=21, bg="white",
-       cex=12*sqrt(margin.table(tbl_gender,2)/max(margin.table(tbl_gender,2))))
-title("Both genders are equialy likely to miss the appointment")
-legend(x=2.5,y=0.5, title="Showed up?", fill=c(2,4),
-       legend=levels(appData$No.show), xpd=TRUE)
-```
-
 **No.show vs other categorical variables**
 
 ```{r categorical_variables_vs_no_show, results="hide"}
