@@ -55,7 +55,7 @@ appData <- appData[appData$Age>=0,]
 ## Data composition
 
 **Distribution of genders**
-```{r gender_distribution}
+```{r gender_distribution, fig.height=10}
 par(mfrow=c(2,1))
 tbl_gender <- table(appData$No.show, appData$Gender) 
 barplot(tbl_gender, xlab="Gender", ylab="count", col=c(2,4))
@@ -72,11 +72,14 @@ title("Both genders are equialy likely to miss the appointment")
 ```{r hist_ages_1, fig.show="hide"}
 hist_age<-hist(appData$Age)
 ```
-```{r hist_ages_2}
+```{r hist_ages_2, fig.height=10}
+par(mfrow=c(2,1))
 barplot(table(appData$No.show, cut(appData$Age, hist_age$breaks,
 	include.lowest=TRUE)), xlab="Age Bracket", ylab="count", col=c(2,4))
 title("Histogram of Age")
 legend("topright", title="Showed up?", fill=c(2,4), legend=levels(appData$No.show))
+barplot(table(appData$No.show, cut(appData$Age, hist_age$breaks)) %>% prop.table(2),
+	xlab="Age Bracket", ylab="Proportion", col=c(2,4))
 ```
 
 **Distribution of waiting time**
@@ -127,23 +130,6 @@ mtext("Distributions of other categorical variables.", outer = TRUE, cex = 1.5)
 ```
 
 ## Relation of variables to No.show
-
-**No.show vs age**
-
-```{r no_show_composition_by_age}
-.default_paramenters = par(no.readonly = TRUE)
-par(mar=par("mar") + c(0,0,0,7))
-middle_points <-
-	barplot(table(appData$No.show, cut(appData$Age, hist_age$breaks)) %>%
-		prop.table(2),
-		xlab="Age Bracket", ylab="Proportion", col=c(2,4))
-points(middle_points, rep(0.2, length(middle_points)), pch=21, bg="white",
-       cex=6*sqrt(hist_age$counts/max(hist_age$counts)))
-title(main="No.show by age. As pople ages, they show up slightly less.") 
-legend(x=30,y=0.6, title="Showed up?", fill=c(2,4),
-       legend=levels(appData$No.show), xpd=TRUE)
-par(.default_paramenters)
-```
 
 **No.show vs other categorical variables**
 
