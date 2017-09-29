@@ -1,0 +1,247 @@
+# Exploring No Show data
+
+```{r setup, results="hide"}
+require("ggplot2")
+require("dplyr")
+require("functional")
+require("knitr")
+```
+
+## Loading the data
+
+```{r load_data}
+appData <-
+	read.csv(
+		 unz("data/noshowappointments.zip", "KaggleV2-May-2016.csv"),
+		 header=TRUE)
+```
+
+## Computing new variables
+
+**Wait**: the number of days from the scheduling date to the appointment date.
+
+```{r compute_wait}
+schedDay <- const (
+	sapply(X = (appData$ScheduledDay %>% as.character %>% strsplit("T")),
+	       FUN=`[[`, 1) %>%
+	strptime("%Y-%m-%d") %>% as.Date)
+
+
+appDay <- const (
+	sapply(X = (appData$AppointmentDay %>% as.character %>% strsplit("T")),
+	       FUN=`[[`, 1) %>%
+	strptime("%Y-%m-%d") %>% as.Date)
+
+appData$Wait= (appDay() - schedDay()) %>% as.numeric #in days
+```
+
+## Cleaning the data
+
+**Removing rows where appoitment time is before scheduled time**
+
+Some appointments have dates are before the scheduling date.
+
+```{r remove_negative_wait}
+appData <- appData[appData$Wait>=0,]
+```
+
+**Remove the register with Age < 0**
+
+```{r}
+print(appData[appData$Age < 0,])
+appData <- appData[appData$Age>=0,]
+```
+
+## Data composition
+
+**Distribution of genders**
+```{r gender_distribution}
+par(mfrow=c(2,1))
+tbl_gender <- table(appData$No.show, appData$Gender) 
+barplot(tbl_gender, xlab="Gender", ylab="count", col=c(2,4))
+title(main="Most patients are female.")
+legend("topright", title="Showed up?", fill=c(2,4),
+       legend=levels(appData$No.show), cex=0.7)
+tbl_gender %>% prop.table(2) %>% 
+	barplot(xlab="Gender", ylab="Proportion", col=c(2,4))
+title("Both genders are equialy likely to miss the appointment")
+```
+
+**Distribution of ages**
+
+```{r hist_ages_1, fig.show="hide"}
+hist_age<-hist(appData$Age)
+```
+```{r hist_ages_2}
+barplot(table(appData$No.show, cut(appData$Age, hist_age$breaks,
+	include.lowest=TRUE)), xlab="Age Bracket", ylab="count", col=c(2,4))
+title("Histogram of Age")
+legend("topright", title="Showed up?", fill=c(2,4), legend=levels(appData$No.show))
+```
+
+**Distribution of waiting time**
+```{r hist_wait, fig.show="hide"}
+hist_wait <-hist(appData$Wait)
+```
+
+```{r hist_wait_2}
+tbl_wait <- table(appData$No.show, cut(appData$Wait, hist_wait$breaks,
+				       include.lowest=TRUE))
+barplot(tbl_wait, xlab="Wait Bracket", ylab="count", col=c(2,4))
+legend("topright", title="Showed up?", fill=c(2,4),
+       legend=levels(appData$No.show))
+title("Histogram of Wait")
+```
+
+**Distribution of Neighbourhoods**
+
+```{r hist_neighbourhood, fig.height=10}
+tbl_neigh <- table(appData$No.show, appData$Neighbourhood)
+par(mfrow=c(2,1))
+barplot(tbl_neigh, col=c(2,4),
+	ylab="Count", xlab="Neighbourhood")
+legend(x=0,y=-5000, title="Showed up?", fill=c(2,4),
+       legend=levels(appData$No.show), cex=0.7, xpd=TRUE)
+barplot(tbl_neigh %>% prop.table(2), col=c(2,4),
+	ylab="Proportion", xlab="Neighbourhood")
+```
+
+**Distribution of other categorical variables**
+
+```{r hists_categorical_variables, results="hide"}
+par("mar"=par("mar")*0.5)
+par(oma = c(0,0,2,0))
+layout(matrix(c(1,2,3,4,5,6,7,7,7),nrow = 3,ncol = 3,byrow = TRUE),
+       heights = c(0.39,0.39,0.22))
+mapply(FUN=function(column,varname) {
+	table(appData$No.show, column) %>%
+	barplot(xlab=varname, ylab="Count", col=c(2,4))
+},appData[,8:13], names(appData)[8:13])
+plot(1, type = "n", axes=FALSE, xlab="", ylab="")
+legend("top", inset=0, title="Legend",
+       pch=c(15,15,21), col=c(2,4),
+       legend=c("No Show", "Yes Show"),
+       , horiz=TRUE)
+
+mtext("Distributions of other categorical variables.", outer = TRUE, cex = 1.5)
+```
+
+## Relation of variables to No.show
+
+**No.show vs age**
+
+```{r no_show_composition_by_age}
+.default_paramenters = par(no.readonly = TRUE)
+par(mar=par("mar") + c(0,0,0,7))
+middle_points <-
+	barplot(table(appData$No.show, cut(appData$Age, hist_age$breaks)) %>%
+		prop.table(2),
+		xlab="Age Bracket", ylab="Proportion", col=c(2,4))
+points(middle_points, rep(0.2, length(middle_points)), pch=21, bg="white",
+       cex=6*sqrt(hist_age$counts/max(hist_age$counts)))
+title(main="No.show by age. As pople ages, they show up slightly less.") 
+legend(x=30,y=0.6, title="Showed up?", fill=c(2,4),
+       legend=levels(appData$No.show), xpd=TRUE)
+par(.default_paramenters)
+```
+
+**No.show vs gender**
+
+```{r no_show_by_gender}
+par(mar=par("mar")+c(0,0,0,5))
+middle_points <- tbl_gender %>% prop.table(2) %>% 
+	barplot(xlab="Gender", ylab="Proportion", col=c(2,4))
+points(middle_points, rep(0.2, length(middle_points)), pch=21, bg="white",
+       cex=12*sqrt(margin.table(tbl_gender,2)/max(margin.table(tbl_gender,2))))
+title("Both genders are equialy likely to miss the appointment")
+legend(x=2.5,y=0.5, title="Showed up?", fill=c(2,4),
+       legend=levels(appData$No.show), xpd=TRUE)
+```
+
+**No.show vs other categorical variables**
+
+```{r categorical_variables_vs_no_show, results="hide"}
+par("mar"=par("mar")*0.5)
+par(oma = c(0,0,2,0))
+layout(matrix(c(1,2,3,4,5,6,7,7,7),nrow = 3,ncol = 3,byrow = TRUE), heights =
+       c(0.39,0.39,0.22))
+mapply(FUN=function(column,varname) {
+	tbl_var <- table(appData$No.show, column)
+	count_var <- table(column)
+	middle_points <- barplot(prop.table(tbl_var,2), xlab=varname,
+				 ylab="Proportion", col=c(2,4))
+	points(middle_points, rep(0.3, length(middle_points)), pch=21,
+	       bg="white", cex=10*sqrt(count_var/max(count_var)))
+},appData[,8:13], names(appData)[8:13])
+plot(1, type = "n", axes=FALSE, xlab="", ylab="")
+legend("top", inset=0, title="Legend",
+       pch=c(15,15,21), col=c(2,4,1),
+       legend=c("No Show", "Yes Show", "Subsample size"),
+       , horiz=TRUE)
+
+mtext("SMS_received improves the assistance.", outer = TRUE, cex = 1.5)
+```
+
+**No.show vs wait**
+
+```{r no_show_vs_wait }
+.default_paramenters = par(no.readonly = TRUE)
+par(mar=par("mar") + c(0,0,0,7))
+middle_points <- barplot(tbl_wait %>% prop.table(2), xlab="Wait",
+			 ylab="Proportion of No.show", col=c(2,4))
+points(middle_points, rep(0.2, length(middle_points)), pch=21, bg="white",
+       cex=12*sqrt(hist_wait$counts/max(hist_wait$counts)))
+legend(x=24,y=0.6, title="Legend",
+       pch=c(15,15,21), col=c(2,4,1),
+       legend=c("Didn't show", "Showed up", "Bracket size"), xpd=TRUE)
+title(main="Lower wait times have worse assitence.")
+par(.default_paramenters)
+```
+
+The areas of the circles are proportional to the amount of data in the bracket.
+
+**Did the patient showed up for its previous appointment**
+
+```{r previous_appointment}
+last_outcome <- appData %>% select(PatientId, No.show) %>%
+	group_by(PatientId) %>% 
+	mutate(Previous=lag(No.show)) %>% ungroup
+nextVsPrev <- const %$% table(last_outcome$No.show, last_outcome$Previous,
+			      useNA="ifany")
+par(mfrow=c(1,2), oma = c(0, 0, 2, 0))
+nextVsPrev() %>%
+	barplot(xlab="Previos No.show", ylab="count",
+		names.arg=c("No", "Yes", "NA"), col=c("red","blue"))
+legend(x=0.5,y=60000, title="Showed up?", fill=c("red","blue"),
+       legend=levels(appData$No.show))
+nextVsPrev() %>% prop.table(2) %>%
+	barplot(xlab="Previos No.show", ylab="Proportion",
+		names.arg=c("No", "Yes", "NA"), col=c("red","blue"))
+mtext("Next show up vs previous show up.", outer = TRUE, cex = 1.5)
+```
+
+**[EXTRA]Gender by age**
+```{r age_by_gender, results="hide" }
+par(mar=par("mar") + c(0,0,0,10))
+middle_points <- table(appData$Gender, cut(appData$Age, hist_age$breaks,
+					   include.lowest=TRUE)) %>%
+	prop.table(2) %>%
+	barplot(xlab="Age Bracket", ylab="Proportion", col=c(2,4))
+points(middle_points, rep(0.2, length(middle_points)), pch=21, bg="white",
+       cex=6*sqrt(hist_age$counts/max(hist_age$counts)))
+title(main="Women are the majoriry after 16.") 
+legend(x=30,y=0.6, title="Legend",
+       pch=c(15,15,21), col=c(2,4,1),
+       legend=c("Female", "Male", "Bracket size"), xpd=TRUE)
+```
+
+Big increase in the proportion of women after 16 years. Me reclaim some prortion
+until 85 years when women proprtion starts to grow again. By 100 years, all
+patients are women.
+
+```{r gender_faceted_age_histogram, results="hide"}
+table(appData$Gender, cut(appData$Age, hist_age$breaks , include.lowest=TRUE)) %>%
+	barplot(xlab="Age Bracket", ylab="Count", col=c(2,4))
+legend("topright", title="Gender", fill=c("red", "blue"),
+       legend=levels(appData$Gender))
+```
