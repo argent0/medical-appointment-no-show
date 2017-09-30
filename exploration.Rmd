@@ -33,6 +33,8 @@ appDay <- const (
 	strptime("%Y-%m-%d") %>% as.Date)
 
 appData$Wait= (appDay() - schedDay()) %>% as.numeric #in days
+appData$ScheduledDay = schedDay()
+appData$AppointmentDay = appDay()
 ```
 
 ## Cleaning the data
@@ -137,16 +139,29 @@ mapply(FUN=function(column,varname) {
 
 ```
 
+## Some Characteristics
+**Some patients have more than one appointment per day**
+```{r multiple_appointments}
+ordAppData <- appData[order(appData$AppointmentDay),]
+ordAppData %>% group_by(PatientId, AppointmentDay) %>%
+	summarize(C=n()) %>% ungroup() %>% select(C) %>% `[[`(1) %>%
+	table(dnn="Appointments per day")
+```
+
 ## Relation of variables to No.show
 
 **Did the patient showed up for its previous appointment**
 
-```{r previous_appointment}
-last_outcome <- appData %>% select(PatientId, No.show) %>%
-	group_by(PatientId) %>% 
-	mutate(Previous=lag(No.show)) %>% ungroup
-nextVsPrev <- const %$% table(last_outcome$No.show, last_outcome$Previous,
-			      useNA="ifany")
+```{r previous_appointment, cache=TRUE}
+last_outcome <- ordAppData %>% group_by(PatientId, AppointmentDay) %>%
+	summarize(nYes=sum(No.show == "Yes"), nNo=sum(No.show == "No")) %>% ungroup %>%
+	group_by(PatientId) %>%
+	mutate(pnYes=lag(nYes), pnNo=lag(nNo)) %>% ungroup
+
+ordAppDataWithLastOutcome <- inner_join(ordAppData, last_outcome, by= c("PatientId","AppointmentDay"))
+
+nextVsPrev <- const %$% table(ordAppDataWithLastOutcome$No.show,
+			      ordAppDataWithLastOutcome$pnYes > 0, useNA="ifany")
 par(mfrow=c(1,2), oma = c(0, 0, 2, 0))
 nextVsPrev() %>%
 	barplot(xlab="Previos No.show", ylab="count",
@@ -160,18 +175,17 @@ mtext("Next show up vs previous show up.", outer = TRUE, cex = 1.5)
 ```
 
 **[EXTRA]Gender by age**
-```{r age_by_gender, results="hide" }
-par(mar=par("mar") + c(0,0,0,10))
-middle_points <- table(appData$Gender, cut(appData$Age, hist_age$breaks,
-					   include.lowest=TRUE)) %>%
-	prop.table(2) %>%
-	barplot(xlab="Age Bracket", ylab="Proportion", col=c(2,4))
-points(middle_points, rep(0.2, length(middle_points)), pch=21, bg="white",
-       cex=6*sqrt(hist_age$counts/max(hist_age$counts)))
+```{r age_by_gender, results="hide", fig.height=10 }
+par(mfrow=c(2,1))
+table(appData$Gender, cut(appData$Age, hist_age$breaks , include.lowest=TRUE)) %>%
+	barplot(xlab="Age Bracket", ylab="Count", col=c(2,4))
+legend("topright", title="Legend",
+       pch=c(15,15), col=c(2,4),
+       legend=c("Female", "Male")) 
+table(appData$Gender, cut(appData$Age, hist_age$breaks,
+			  include.lowest=TRUE)) %>%
+	prop.table(2) %>% barplot(xlab="Age Bracket", ylab="Proportion", col=c(2,4))
 title(main="Women are the majoriry after 16.") 
-legend(x=30,y=0.6, title="Legend",
-       pch=c(15,15,21), col=c(2,4,1),
-       legend=c("Female", "Male", "Bracket size"), xpd=TRUE)
 ```
 
 Big increase in the proportion of women after 16 years. Me reclaim some prortion
@@ -179,8 +193,4 @@ until 85 years when women proprtion starts to grow again. By 100 years, all
 patients are women.
 
 ```{r gender_faceted_age_histogram, results="hide"}
-table(appData$Gender, cut(appData$Age, hist_age$breaks , include.lowest=TRUE)) %>%
-	barplot(xlab="Age Bracket", ylab="Count", col=c(2,4))
-legend("topright", title="Gender", fill=c("red", "blue"),
-       legend=levels(appData$Gender))
 ```
