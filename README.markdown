@@ -5,3 +5,8 @@
 
 The `handcap` variable is for Handicap. It seems to be the number of total
 handicaps the person has.
+
+## Iteration 2
+
+* decision tree
+* seasonality

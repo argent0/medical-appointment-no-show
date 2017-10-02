@@ -1,7 +1,9 @@
 # Exploring No Show data
 
+The objective of this exploration is to present the main characteristics of
+data set visually.
+
 ```{r setup, results="hide"}
-require("ggplot2")
 require("dplyr")
 require("functional")
 require("knitr")
@@ -15,6 +17,26 @@ appData <-
 		 unz("data/noshowappointments.zip", "KaggleV2-May-2016.csv"),
 		 header=TRUE)
 ```
+
+## Description of Variables
+
+```{r structure}
+str(appData)
+```
+
+Some variables that might require a short explanation:
+
+* **ScheduledDay**: The day the appointment was made.
+* **AppointmentDay**: The day of the appointment.
+* **Neighbourhood**: The Neighbourhood where the clinic is located.
+* **Scholarship**: 1 if the person receives
+  [aid from the government](https://en.wikipedia.org/wiki/Bolsa_Fam%C3%ADlia).
+* **Handcap**: According to the source, A number that represents the person's
+  disabilities.
+* **SMS_received**: Whether the people received an SMS reminding them of the
+  appointment. 
+* **No.show**: "Yes", means that the person missed the appointment. "No", that
+  the person went to the appointment.
 
 ## Computing new variables
 
@@ -62,11 +84,11 @@ par(mfrow=c(2,1))
 tbl_gender <- table(appData$No.show, appData$Gender) 
 barplot(tbl_gender, xlab="Gender", ylab="count", col=c(2,4))
 title(main="Most patients are female.")
-legend("topright", title="Showed up?", fill=c(2,4),
+legend("topright", title="No.show", fill=c(2,4),
        legend=levels(appData$No.show), cex=0.7)
 tbl_gender %>% prop.table(2) %>% 
 	barplot(xlab="Gender", ylab="Proportion", col=c(2,4))
-title("Both genders are equialy likely to miss the appointment")
+title("Both genders are equally likely to miss the appointment")
 ```
 
 **Distribution of ages**
@@ -79,7 +101,7 @@ par(mfrow=c(2,1))
 barplot(table(appData$No.show, cut(appData$Age, hist_age$breaks,
 	include.lowest=TRUE)), xlab="Age Bracket", ylab="count", col=c(2,4))
 title("Histogram of Age")
-legend("topright", title="Showed up?", fill=c(2,4), legend=levels(appData$No.show))
+legend("topright", title="No.show", fill=c(2,4), legend=levels(appData$No.show))
 barplot(table(appData$No.show, cut(appData$Age, hist_age$breaks)) %>% prop.table(2),
 	xlab="Age Bracket", ylab="Proportion", col=c(2,4))
 ```
@@ -94,12 +116,12 @@ par(mfrow=c(2,1))
 tbl_wait <- table(appData$No.show, cut(appData$Wait, hist_wait$breaks,
 				       include.lowest=TRUE))
 barplot(tbl_wait, xlab="Wait Bracket", ylab="count", col=c(2,4))
-legend("topright", title="Showed up?", fill=c(2,4),
+legend("topright", title="No.show", fill=c(2,4),
        legend=levels(appData$No.show))
 title("Histogram of Wait")
 barplot(tbl_wait %>% prop.table(2), xlab="Wait",
 			 ylab="Proportion of No.show", col=c(2,4))
-title(main="Lower wait times have worse assitence.")
+title(main="Lower wait times have better turn up.")
 ```
 
 **Distribution of Neighbourhoods**
@@ -109,26 +131,27 @@ tbl_neigh <- table(appData$No.show, appData$Neighbourhood)
 par(mfrow=c(2,1))
 barplot(tbl_neigh, col=c(2,4),
 	ylab="Count", xlab="Neighbourhood")
-legend("topleft", title="Showed up?", fill=c(2,4),
+legend("topleft", title="No.show", fill=c(2,4),
        legend=levels(appData$No.show), cex=0.7, xpd=TRUE)
 barplot(tbl_neigh %>% prop.table(2), col=c(2,4),
 	ylab="Proportion", xlab="Neighbourhood")
-title(main="Most location have the same assistance rate")
+title(main="Most location have the same turn up ratio")
 ```
 
 **Distribution of other categorical variables**
 
 ```{r hists_categorical_variables, results="hide", fig.height=20}
-#par("mar"=par("mar")*1.71)
 par(oma = c(0,0,2,0))
-layout(matrix(c(1,1,seq(2,13)),nrow = 7,ncol = 2,byrow = TRUE))
-       #,heights = c(0.39,0.39,0.22))
+hs <- c(0.75,rep(1,6))
+hs <- hs / sum(hs)
+layout(matrix(c(1,1,seq(2,13)),nrow = 7,ncol = 2,byrow = TRUE)
+       ,heights = hs)
 plot(1, type = "n", axes=FALSE, xlab="", ylab="")
-legend("bottom", inset=0, title="Legend",
+legend("bottom", inset=0, title="No.show",
        pch=c(15,15,21), col=c(2,4),
-       legend=c("No Show", "Yes Show"),
+       legend=c("No", "Yes"),
        , horiz=TRUE)
-title(main="Histogram/Composition", sub="Sending SMS is helpful")
+title(main="Histogram/Composition", sub="Maybe SMS = 1 means no SMS was sent.")
 
 mapply(FUN=function(column,varname) {
 	tbl_var <- table(appData$No.show, column)
@@ -137,7 +160,12 @@ mapply(FUN=function(column,varname) {
 				 ylab="Proportion", col=c(2,4))
 },appData[,8:13], names(appData)[8:13])
 
+
 ```
+
+
+The last row of plots suggests that when `SMS_received == 0` the patient is more
+likely to show up. **Thus the `0` might mean that SMS was received**.
 
 ## Some Characteristics
 **Some patients have more than one appointment per day**
@@ -166,13 +194,16 @@ par(mfrow=c(1,2), oma = c(0, 0, 2, 0))
 nextVsPrev() %>%
 	barplot(xlab="Previos No.show", ylab="count",
 		names.arg=c("No", "Yes", "NA"), col=c("red","blue"))
-legend(x=0.5,y=60000, title="Showed up?", fill=c("red","blue"),
+legend(x=0.5,y=60000, title="No.show", fill=c("red","blue"),
        legend=levels(appData$No.show))
 nextVsPrev() %>% prop.table(2) %>%
 	barplot(xlab="Previos No.show", ylab="Proportion",
 		names.arg=c("No", "Yes", "NA"), col=c("red","blue"))
-mtext("Next show up vs previous show up.", outer = TRUE, cex = 1.5)
+mtext("Next No.show vs previous No.show.", outer = TRUE, cex = 1.5)
 ```
+
+Patients that missed their previous appointment are more likely to miss the next
+one.
 
 **[EXTRA]Gender by age**
 ```{r age_by_gender, results="hide", fig.height=10 }
@@ -185,12 +216,7 @@ legend("topright", title="Legend",
 table(appData$Gender, cut(appData$Age, hist_age$breaks,
 			  include.lowest=TRUE)) %>%
 	prop.table(2) %>% barplot(xlab="Age Bracket", ylab="Proportion", col=c(2,4))
-title(main="Women are the majoriry after 16.") 
+title(main="Women are the majority after the age of 16.")
 ```
 
-Big increase in the proportion of women after 16 years. Me reclaim some prortion
-until 85 years when women proprtion starts to grow again. By 100 years, all
-patients are women.
-
-```{r gender_faceted_age_histogram, results="hide"}
-```
+Big increase in the proportion of women after 16 years.
