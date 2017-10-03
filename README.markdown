@@ -10,3 +10,4 @@ handicaps the person has.
 
 * decision tree
 * seasonality
+* Information gain per feature.
