@@ -61,11 +61,11 @@ Some variables that might require a short explanation:
 
 ## Computing derived features.
 
-One of the factor that might be relevant to the turn up ratio is the
+One of the factors that might be relevant to the turn up ratio is the
 length of time from the day the appointment was scheduled to the appointment
 itself. Let us, thus, define:
 
-**Wait**: the number of days from the scheduling date to the appointment date.
+**Wait** as the number of days from the scheduling date to the appointment date.
 
 ```{r compute_wait, cache=TRUE}
 schedDay <- const (
@@ -130,7 +130,7 @@ title("Both genders are equally likely to miss the appointment")
 
 **Age**
 
-After the age of 90 there are only a few samples, so the proportions aren't
+After the age of 90 years there are only a few samples, so the proportions aren't
 significative.
 
 ```{r hist_ages_1, fig.show="hide"}
@@ -150,7 +150,7 @@ title("Proportion of No.show by age")
 **Waiting Time**
 
 Most appointments are same-day or for the next day. Those
-appointments also have better turn up. Careful, the histograms below have
+appointments also have better turn up. *Warning*, the histograms below have
 non-uniform bin sizes.
 
 ```{r hist_wait, fig.show="hide"}
