@@ -1,6 +1,7 @@
 ```{r setup, results="hide", echo=FALSE}
 require("dplyr", warn.conflicts=FALSE, quietly = TRUE)
-options(knitr.package.echo=FALSE)
+#options(knitr.package.echo=FALSE)
+#options(knitr.package.dev=c("svg"))
 ```
 
 # Exploring No Show data
@@ -39,13 +40,15 @@ appData <-
 		 header=TRUE)
 ```
 
-## Available features.
+## Available Features.
+
+The structure of the data is:
 
 ```{r structure}
 str(appData)
 ```
 
-Some variables that might require a short explanation:
+Next are some variables that might require a short explanation:
 
 * **ScheduledDay**: The day the appointment was scheduled.
 * **AppointmentDay**: The day of the appointment.
@@ -59,7 +62,7 @@ Some variables that might require a short explanation:
 * **No.show**: The value "Yes", means that the person missed the appointment.
   The value "No", means that the person didn't miss the appointment.
 
-## Computing derived features.
+## Computing Derived Features.
 
 One of the factors that might be relevant to the turn up ratio is the
 length of time from the day the appointment was scheduled to the appointment
@@ -84,7 +87,7 @@ appData$ScheduledDay = schedDay()
 appData$AppointmentDay = appDay()
 ```
 
-## Cleaning the data
+## Cleaning The Data
 
 Some rows with negative `Wait` or `Age` where ignored when performing the
 analysis.
@@ -261,7 +264,7 @@ nextVsPrev() %>% prop.table(2) %>%
 mtext("Next No.show vs previous No.show.", outer = TRUE, cex = 1.5)
 ```
 
-## [EXTRA]Gender by age
+## [EXTRA]Gender Composition By Age
 
 **Why is the proportion of women so large?**
 
