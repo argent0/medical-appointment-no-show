@@ -1,7 +1,6 @@
 ```{r setup, results="hide", echo=FALSE}
-require("dplyr")
-require("knitr")
-opts_chunk$set(echo=FALSE)
+require("dplyr", warn.conflicts=FALSE, quietly = TRUE)
+options(knitr.package.echo=FALSE)
 ```
 
 # Exploring No Show data

@@ -1,1 +1,11 @@
 *.swp
+.Rhistory
+Session.vim
+cache/
+data/
+exploration_cache/
+exploration_files/
+figure/
+exploration.html
+exploration.md
+exploration.pdf
