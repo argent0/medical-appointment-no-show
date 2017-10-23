@@ -1,0 +1,48 @@
+```{r}
+require("functional")
+require("dplyr")
+```
+
+```{r load_data}
+#Loading the data
+appData <-
+	read.csv(
+		 unz("data/noshowappointments.zip", "KaggleV2-May-2016.csv"),
+		 header=TRUE)
+
+# Computing the wait
+schedDay <- const (
+	sapply(X = (appData$ScheduledDay %>% as.character %>% strsplit("T")),
+	       FUN=`[[`, 1) %>%
+	strptime("%Y-%m-%d") %>% as.Date)
+
+
+appDay <- const (
+	sapply(X = (appData$AppointmentDay %>% as.character %>% strsplit("T")),
+	       FUN=`[[`, 1) %>%
+	strptime("%Y-%m-%d") %>% as.Date)
+
+appData$Wait= (appDay() - schedDay()) %>% as.numeric #in days
+appData$ScheduledDay = schedDay()
+appData$AppointmentDay = appDay()
+
+# Data clean up
+appData <- appData[appData$Wait>=0,]
+appData <- appData[appData$Age>=0,]
+```
+
+## Training a Tree model
+
+```{r}
+require("rpart")
+treeModel <- rpart(No.show ~ Wait + SMS_received + Age,
+		   data=appData,
+		   method="class",
+		   parms=list(split="information"),
+		   control=rpart.control(cp=0, maxdepth=8))
+summary(treeModel)
+plot(treeModel, uniform=TRUE)
+text(treeModel, use.n=TRUE,cex=0.7)
+text.rpart
+plot.rpart
+```
