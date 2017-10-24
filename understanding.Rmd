@@ -34,15 +34,21 @@ appData <- appData[appData$Age>=0,]
 ## Training a Tree model
 
 ```{r}
-require("rpart")
-treeModel <- rpart(No.show ~ Wait + SMS_received + Age,
-		   data=appData,
-		   method="class",
-		   parms=list(split="information"),
-		   control=rpart.control(cp=0, maxdepth=8))
+require("party")
+treeModel <- ctree(No.show ~ Wait + SMS_received + Age + Scholarship + Gender,
+		   data=appData, control=ctree_control(minbucket=5000))
 summary(treeModel)
-plot(treeModel, uniform=TRUE)
-text(treeModel, use.n=TRUE,cex=0.7)
-text.rpart
-plot.rpart
+plot(treeModel)
+
+range(appData$ScheduledDay)
+range(appData$AppointmentDay)
+
+# Predict probabilities from the model
+pred <- Predict(treeModel, appData[1:5000,], type="prob")
+
+prop.table(table(appData$No.show))
+
+prob <- matrix(unlist(pred),ncol=2,byrow=TRUE)[,2]
+
+
 ```
