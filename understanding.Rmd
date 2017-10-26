@@ -1,6 +1,18 @@
+# TODO
+
+* <s>Split the data into a test,validation, train set</s>
+* Train a ctree.
+* Use validation to adjust some parameters.
+* Use test to evaluate the resulting model.
+
+The objective is to explain/understand rather than predict. That is why I prefer
+simpler models to more performant ones.
+
 ```{r}
 require("functional")
 require("dplyr")
+require("party")
+require("Metrics")
 ```
 
 ```{r load_data}
@@ -31,24 +43,158 @@ appData <- appData[appData$Wait>=0,]
 appData <- appData[appData$Age>=0,]
 ```
 
+## Some extra EDA (To be moved to the previous article)
+
+```{r eda}
+eda <- list()
+eda$n_samples <- nrow(appData) #110,521
+eda$n_patients <- length(unique(appData$PatientId)) #62,298
+eda$n_appointments <- length(unique(appData$AppointmentID)) #one row per appointment
+eda$n_neighbourhoods <- nlevels(appData$Neighbourhood) #81
+eda$range_wait <- range( appData$Wait ) # Waits of up to 179 days
+eda$range_scheduledDay <- range( appData$ScheduledDay ) #"2015-11-10" "2016-06-08"
+eda$range_appointmentDay <- range( appData$AppointmentDay ) #"2016-04-29" "2016-06-08"
+```
+
+**Number of programmed appointments per day**
+```{r appointments_per_day}
+barplot(table(appData$AppointmentDay))
+table(appData$AppointmentDay)
+```
+
+## Train, Validation, Test set split
+
+I'll split by AppointmentDay in the following way:
+
+* the first 14 days for training
+* the next 7 days for validation
+* the final 6 days for testing
+
+```{r samples_split}
+train <- appData[appData$AppointmentDay <= "2016-05-17",]
+nrow(train) #54,889
+range(train$AppointmentDay)
+validation <- appData[appData$AppointmentDay > "2016-05-17" &
+		appData$AppointmentDay <= "2016-05-31",]
+nrow(validation) #29,182
+test <- appData[appData$AppointmentDay > "2016-05-31",]
+nrow(test) #26,450
+
+barplot(unlist(lapply(list(train=train,validation=validation,test=test), nrow)))
+
+# The partition of the `Wait` is not uniform.
+# Nevertheless, I keep it this way of partitioning b.c. I
+# prioritize having the sets one following the other in time since
+# those are more similar the the conditions in which the model will be deployed
+
+range(train$Wait)
+range(validation$Wait)
+range(test$Wait)
+```
+
 ## Training a Tree model
 
-```{r}
-require("party")
+```{r train_tree_model}
+
+learning_curve_step <- function(limit_date) {
+	train_set <- train$AppointmentDay <= limit_date
+
+	validation_step <- function(tree_depth) {
+		treeModel <- ctree(No.show ~ Wait + SMS_received + Age + Scholarship + Gender,
+				   data=train,
+				   subset=train_set,
+				   control=ctree_control(mincriterion=0.95,
+							 minbucket=500,
+							 maxdepth=tree_depth))
+
+		# Predict probabilities from the model
+		pred_train <- unlist(lapply(treeresponse(treeModel),FUN=`[`,2))
+		ground_trurh_train <- ((as.integer(train[train_set, "No.show"])+1)%%2)
+
+		loss_train <- logLoss(ground_trurh_train, pred_train)
+
+		pred_validation <- unlist(lapply(treeresponse(treeModel, newdata=validation),FUN=`[`,2))
+		ground_trurh_validation <- ((as.integer(validation[, "No.show"])+1)%%2)
+		loss_validation <- logLoss(ground_trurh_validation, pred_validation)
+		return(c(loss_train, loss_validation))
+	}
+
+	result <- list(n_samples=sum(train_set),
+		       loss=Vectorize(validation_step)(seq(8)))
+
+	print(result)
+	return(result)
+}
+
+learning_curve <- lapply( as.list(sort(unique(train$AppointmentDay))), learning_curve_step)
+```
+## Learning Curve
+
+Training error greater that validation error possible because the validation
+sets has easier cases.
+
+```{r learning_curve}
+best_val_perf <- sapply(learning_curve, FUN=function(elm) { return(min(elm$loss[2,])) })
+best_train_perf <- sapply(learning_curve, FUN=function(elm) { return(min(elm$loss[1,])) })
+best_val_tree_size <- sapply(learning_curve, FUN=function(elm) { return(which.min(elm$loss[2,])) })
+best_val_train_size <- sapply(learning_curve, FUN=function(elm) { return(which.min(elm$loss[1,])) })
+
+sample_size <- sapply(learning_curve, FUN=function(elm) {return(elm$n_samples)})
+plot(sample_size, best_val_perf,ylim=range(c(best_val_perf,best_train_perf)))
+lines(sample_size, best_val_perf,ylim=range(c(best_val_perf,best_train_perf)))
+points(sample_size, best_train_perf, col=2, pch=4)
+lines(sample_size, best_train_perf, col=2)
+```
+
+## Validation curve. To pick the tree depth.
+
+```{r validation_curve}
+picked_training_size <- which.min(best_val_perf) #an index in the larning_curve
+plot(seq(8), learning_curve[[picked_training_size]]$loss[2,])
+
+picked_tree_depth = 5 # b.c there isn't much difference with 6
+```
+
+## Resulting model
+
+```{r resulting_model}
 treeModel <- ctree(No.show ~ Wait + SMS_received + Age + Scholarship + Gender,
-		   data=appData, control=ctree_control(minbucket=5000))
-summary(treeModel)
-plot(treeModel)
+		   data=rbind(train, validation),
+		   control=ctree_control(mincriterion=0.95,
+					 minbucket=500,
+					 maxdepth=picked_tree_depth))
+```
 
-range(appData$ScheduledDay)
-range(appData$AppointmentDay)
+### Calibration in the train set
 
-# Predict probabilities from the model
-pred <- Predict(treeModel, appData[1:5000,], type="prob")
+```{r calibration_curve_train}
+pred_train <- unlist(lapply(treeresponse(treeModel),FUN=`[`,2))
+ground_trurh_train <- ((as.integer(rbind(train,validation)[, "No.show"])+1)%%2)
 
-prop.table(table(appData$No.show))
+calibration_train <- lapply(split(ground_trurh_train, as.factor(pred_train)), FUN=mean)
+deviation_train <- lapply(split(ground_trurh_train, as.factor(pred_train)), FUN=sd)
+upper_bound <- unlist(calibration_train)+unlist(deviation_train)
+lower_bound <- unlist(calibration_train)-unlist(deviation_train)
 
-prob <- matrix(unlist(pred),ncol=2,byrow=TRUE)[,2]
+plot(as.numeric(names(calibration_train)), calibration_train,ylim=range(c(upper_bound, lower_bound)))
+lines(as.numeric(names(calibration_train)), unlist(calibration_train)+unlist(deviation))
+lines(as.numeric(names(calibration_train)), unlist(calibration_train)-unlist(deviation),type="l")
+abline(0,1,lty=2)
+```
 
+### Calibration in the test set
 
+```{r calibration_curve_test}
+pred_test <- unlist(lapply(treeresponse(treeModel, newdata=test),FUN=`[`,2))
+ground_trurh_test <- ((as.integer(test[, "No.show"])+1)%%2)
+
+calibration_test <- lapply(split(ground_trurh_test, as.factor(pred_test)), FUN=mean)
+deviation_test <- lapply(split(ground_trurh_test, as.factor(pred_test)), FUN=sd)
+upper_bound <- unlist(calibration_test)+unlist(deviation_test)
+lower_bound <- unlist(calibration_test)-unlist(deviation_test)
+
+plot(as.numeric(names(calibration_test)), calibration_test,ylim=range(c(upper_bound, lower_bound)))
+lines(as.numeric(names(calibration_test)), unlist(calibration_test)+unlist(deviation))
+lines(as.numeric(names(calibration_test)), unlist(calibration_test)-unlist(deviation),type="l")
+abline(0,1,lty=2)
 ```
