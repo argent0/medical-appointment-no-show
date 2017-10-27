@@ -201,7 +201,7 @@ legend("bottomright", title="Performance", pch=c(4,1),
        legend=c("Traning","Validation"))
 ```
 
-This curve's validation performance shows the diminishing returns of using more
+The performance in the validation set shows the diminishing returns of using more
 data, but it seems the limit has not been reached yet after spending
 all the available data. It also shows that for small number of samples, the
 training and validation errors differ substantially.
@@ -237,23 +237,6 @@ treeModel <- ctree(No.show ~ Wait + SMS_received + Age + Scholarship + Gender,
 		   control=ctree_control(mincriterion=0.95,
 					 minbucket=500,
 					 maxdepth=picked_tree_depth))
-```
-
-### Calibration in the train set
-
-```{r calibration_curve_train, cache=TRUE}
-pred_train <- unlist(lapply(treeresponse(treeModel),FUN=`[`,2))
-ground_trurh_train <- ((as.integer(rbind(train,validation)[, "No.show"])+1)%%2)
-
-calibration_train <- lapply(split(ground_trurh_train, as.factor(pred_train)), FUN=mean)
-deviation_train <- lapply(split(ground_trurh_train, as.factor(pred_train)), FUN=function(d){
-				  m<- mean(d)
-				  return(m*(1-m)/length(d))})
-
-range(deviation_train)
-
-plot(as.numeric(names(calibration_train)), calibration_train,ylim=range(c(upper_bound, lower_bound)))
-abline(0,1,lty=2)
 ```
 
 ### Calibration in the test set
