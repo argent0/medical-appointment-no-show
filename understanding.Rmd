@@ -13,9 +13,11 @@ require("functional")
 require("dplyr")
 require("party")
 require("Metrics")
+options(knitr.package.dev=c("svg"))
+options(knitr.package.echo=FALSE)
 ```
 
-```{r load_data}
+```{r load_data, cache=TRUE}
 #Loading the data
 appData <-
 	read.csv(
@@ -57,44 +59,81 @@ eda$range_appointmentDay <- range( appData$AppointmentDay ) #"2016-04-29" "2016-
 ```
 
 **Number of programmed appointments per day**
+
 ```{r appointments_per_day}
 barplot(table(appData$AppointmentDay))
-table(appData$AppointmentDay)
 ```
 
-## Train, Validation, Test set split
+## Splitting the data into Train, Validation & Test
 
-I'll split by AppointmentDay in the following way:
+The splitting criterion is using by `AppointmentDay` in the following way:
 
-* the first 14 days for training
+* the first 14 days of data go for training
 * the next 7 days for validation
 * the final 6 days for testing
 
-```{r samples_split}
+This results in the following sizes for each set.
+
+```{r samples_split, cache=TRUE}
 train <- appData[appData$AppointmentDay <= "2016-05-17",]
-nrow(train) #54,889
-range(train$AppointmentDay)
 validation <- appData[appData$AppointmentDay > "2016-05-17" &
 		appData$AppointmentDay <= "2016-05-31",]
-nrow(validation) #29,182
 test <- appData[appData$AppointmentDay > "2016-05-31",]
-nrow(test) #26,450
 
-barplot(unlist(lapply(list(train=train,validation=validation,test=test), nrow)))
+(function(){
+	 nrows <- lapply(list(Train=train,Validation=validation,Test=test), nrow)
+	 midpoints <- barplot(unlist(nrows) , ylab="Number of Rows")
+	 text(midpoints,unlist(nrows)-1500,c(nrow(train),nrow(validation),nrow(test)))
+	 title(main="Number of samples in each partition")
+	})()
 
-# The partition of the `Wait` is not uniform.
-# Nevertheless, I keep it this way of partitioning b.c. I
-# prioritize having the sets one following the other in time since
-# those are more similar the the conditions in which the model will be deployed
+```
 
-range(train$Wait)
-range(validation$Wait)
-range(test$Wait)
+Unfortunately, partitioning this way doesn't distribute the maximum `Wait`
+equally among the sets.
+Nevertheless, this method is preferred because,
+having the sets one following the other in time,
+portrays better the conditions in which the model would be deployed.
+
+```{r max_wait, cache=TRUE}
+barplot(sapply(list(range(train$Wait)
+		    ,range(validation$Wait)
+		    ,range(test$Wait)),FUN=`[`,2)
+	,names.arg=c("Train","Validation","Test")
+	,ylab="Max Wait"
+	,main="Max Wait in each partition")
 ```
 
 ## Training a Tree model
 
-```{r train_tree_model}
+A decision tree model is chosen to find structure in the data beyond what the
+exploratory data analysis already showed. In particular *conditional inference
+trees* from R's
+[party](https://cran.r-project.org/web/packages/party/vignettes/party.pdf)
+package.
+
+In this case a [Decision trees](https://en.wikipedia.org/wiki/Decision_tree_learning)
+will provide a way classify a patient's appointment into "No-No.show" and
+"Yes-No.Show". (using the data's terminology: "No-No.show" means that the patient
+showed up to the appointment")
+
+**Constraining the model to prevent overfit**
+
+This particular analysis will constrain the tree model in two ways:
+
+1. Each decision in the tree will have an statistical significance, of at least,
+   95%. In other terms, the chance of fitting accidental features on the data is less
+   than 5%.
+2. The *bucket size*, the number of cases at the ends of the tree, should be
+   greater than 500.
+
+Both these constrains prevent the model from over-fitting the training set too
+much.
+
+## Learning Curve
+
+
+```{r train_tree_model, results="hide", cache=TRUE}
 
 learning_curve_step <- function(limit_date) {
 	train_set <- train$AppointmentDay <= limit_date
@@ -128,10 +167,22 @@ learning_curve_step <- function(limit_date) {
 
 learning_curve <- lapply( as.list(sort(unique(train$AppointmentDay))), learning_curve_step)
 ```
-## Learning Curve
 
-Training error greater that validation error possible because the validation
-sets has easier cases.
+**Convergence of the algorithm**
+
+An important question is *whether there is enough data to train a model*.
+Complex models being, generally more data demanding than simpler ones. The
+common procedure to answer this question is using a *learning curve*.
+
+In a learning curve, increasing amounts of data is used to train the model while
+observing its performance on a validation set. This is a diminishing returns
+scenario where doubling the amount of data won't generally double the model's
+performance. Models reach a, practically, maximum performance after which
+using more data doesn't improve performance. Simpler models reach that limit
+with less data than more complex ones.
+
+This is the learning curve for this analysis:
+
 
 ```{r learning_curve}
 best_val_perf <- sapply(learning_curve, FUN=function(elm) { return(min(elm$loss[2,])) })
@@ -140,13 +191,36 @@ best_val_tree_size <- sapply(learning_curve, FUN=function(elm) { return(which.mi
 best_val_train_size <- sapply(learning_curve, FUN=function(elm) { return(which.min(elm$loss[1,])) })
 
 sample_size <- sapply(learning_curve, FUN=function(elm) {return(elm$n_samples)})
-plot(sample_size, best_val_perf,ylim=range(c(best_val_perf,best_train_perf)))
+plot(sample_size, best_val_perf,ylim=range(c(best_val_perf,best_train_perf))
+     ,main="Learning curve", xlab="Number of used samples",
+     ylab="Performance(logloss)" )
 lines(sample_size, best_val_perf,ylim=range(c(best_val_perf,best_train_perf)))
 points(sample_size, best_train_perf, col=2, pch=4)
 lines(sample_size, best_train_perf, col=2)
+legend("bottomright", title="Performance", pch=c(4,1),
+       legend=c("Traning","Validation"))
 ```
 
+This curve's validation performance shows the diminishing returns of using more
+data, but it seems the limit has not been reached yet after spending
+all the available data. It also shows that for small number of samples, the
+training and validation errors differ substantially.
+
+One peculiarity in this analysis is that the training
+error is greater than the validation error for bigger numbers of samples. As
+mentioned before, this might be due to the validation set having "easier" cases
+than the training set.
+
 ## Validation curve. To pick the tree depth.
+
+**Finding the ideal tree depth**
+
+Another aspect of a tree model is its depth, the maximum number of operations
+performed on the sample before getting an answer from the model.
+
+Lower depths mean simpler to interpret models, so they are preferred. Trees of
+up to a depth of 8 are trained in this analysis. The validation set is used,
+afterwards, to pick the simpler one with the least error.
 
 ```{r validation_curve}
 picked_training_size <- which.min(best_val_perf) #an index in the larning_curve
@@ -155,9 +229,9 @@ plot(seq(8), learning_curve[[picked_training_size]]$loss[2,])
 picked_tree_depth = 5 # b.c there isn't much difference with 6
 ```
 
-## Resulting model
+## Testing the resulting model
 
-```{r resulting_model}
+```{r resulting_model, cache=TRUE}
 treeModel <- ctree(No.show ~ Wait + SMS_received + Age + Scholarship + Gender,
 		   data=rbind(train, validation),
 		   control=ctree_control(mincriterion=0.95,
@@ -167,34 +241,51 @@ treeModel <- ctree(No.show ~ Wait + SMS_received + Age + Scholarship + Gender,
 
 ### Calibration in the train set
 
-```{r calibration_curve_train}
+```{r calibration_curve_train, cache=TRUE}
 pred_train <- unlist(lapply(treeresponse(treeModel),FUN=`[`,2))
 ground_trurh_train <- ((as.integer(rbind(train,validation)[, "No.show"])+1)%%2)
 
 calibration_train <- lapply(split(ground_trurh_train, as.factor(pred_train)), FUN=mean)
-deviation_train <- lapply(split(ground_trurh_train, as.factor(pred_train)), FUN=sd)
-upper_bound <- unlist(calibration_train)+unlist(deviation_train)
-lower_bound <- unlist(calibration_train)-unlist(deviation_train)
+deviation_train <- lapply(split(ground_trurh_train, as.factor(pred_train)), FUN=function(d){
+				  m<- mean(d)
+				  return(m*(1-m)/length(d))})
+
+range(deviation_train)
 
 plot(as.numeric(names(calibration_train)), calibration_train,ylim=range(c(upper_bound, lower_bound)))
-lines(as.numeric(names(calibration_train)), unlist(calibration_train)+unlist(deviation))
-lines(as.numeric(names(calibration_train)), unlist(calibration_train)-unlist(deviation),type="l")
 abline(0,1,lty=2)
 ```
 
 ### Calibration in the test set
 
-```{r calibration_curve_test}
+```{r calibration_curve_test, cache=TRUE}
 pred_test <- unlist(lapply(treeresponse(treeModel, newdata=test),FUN=`[`,2))
 ground_trurh_test <- ((as.integer(test[, "No.show"])+1)%%2)
 
 calibration_test <- lapply(split(ground_trurh_test, as.factor(pred_test)), FUN=mean)
-deviation_test <- lapply(split(ground_trurh_test, as.factor(pred_test)), FUN=sd)
-upper_bound <- unlist(calibration_test)+unlist(deviation_test)
-lower_bound <- unlist(calibration_test)-unlist(deviation_test)
+deviation_test <- lapply(split(ground_trurh_test, as.factor(pred_test)), FUN=function(d){
+				  m<- mean(d)
+				  return(m*(1-m)/length(d))})
+
+range(deviation_test)
 
 plot(as.numeric(names(calibration_test)), calibration_test,ylim=range(c(upper_bound, lower_bound)))
-lines(as.numeric(names(calibration_test)), unlist(calibration_test)+unlist(deviation))
-lines(as.numeric(names(calibration_test)), unlist(calibration_test)-unlist(deviation),type="l")
 abline(0,1,lty=2)
 ```
+
+## The Resulting model
+
+**WARNING!**:
+
+* Use <kbd>Ctrl</kbd>&nbsp;<kbd>+</kbd> to enlarge the image below.
+* Use <kbd>Ctrl</kbd>&nbsp;<kbd>-</kbd> to downscale.
+* Use <kbd>Ctrl</kbd>&nbsp;<kbd>0</kbd> to return to the default size.
+
+```{r resulting_model_show ,fig.height=15, fig.width=30,cache=TRUE}
+plot(treeModel)
+```
+
+## Apendix
+
+The desviation is calculated as the posterior variance of beta bernoulli
+distribution in the limit where the amount of data overhelms the prior.
