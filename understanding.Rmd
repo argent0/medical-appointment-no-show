@@ -7,15 +7,14 @@
 
 ### EDA Feedback
 
-* Make a list of what's is to be done to get first version.
 * Make better presentation of the data
 
 ### First version TODO
 
-* Write the motivation as a first paragraph.
-* Reintroduce the dataset.
-* Motivate the data splitting (Why do we split? How? What have we obtained?)
-* Motivate the evaluation criteria.
+* <s>Write the motivation as a first paragraph.</s>
+* <s>Reintroduce the dataset.</s>
+* <s>Motivate the data splitting (Why do we split? How? What have we obtained?)</s>
+* <s>Motivate the evaluation criteria.</s>
 * Move the new EDA to the EDA post.
 
 # Tree Analysis
@@ -111,7 +110,10 @@ Concretely:
   could be designed to corroborate this hypothesis. Or implement other ways of
   reminding (e.g. e-mail).
 
-# Technical details follow
+# Technical details of the construction of the tree.
+
+The final result of the analysis is the tree model. What follow are the
+technical details of its construction.
 
 ##  The Decision Tree
 
@@ -122,7 +124,7 @@ package.
 
 **Constraining the model to prevent overfit**
 
-This particular analysis will constrain the tree model in two ways:
+This particular analysis constrains the tree model in two ways:
 
 1. Each decision in the tree will have an statistical significance, of at least,
    95%. In other terms, the chance of fitting accidental features on the data is less
@@ -130,7 +132,8 @@ This particular analysis will constrain the tree model in two ways:
 2. The *bucket size*, the number of cases at the ends of the tree, should be
    greater than 500.
 
-Both these constrains will improve the model's performance on unseen data.
+Both these constrains will improve the model's performance on unseen data, *e.g.*
+future data.
 
 ```{r}
 require("functional")
@@ -182,21 +185,26 @@ eda$range_scheduledDay <- range( appData$ScheduledDay ) #"2015-11-10" "2016-06-0
 eda$range_appointmentDay <- range( appData$AppointmentDay ) #"2016-04-29" "2016-06-08"
 ```
 
-**Number of programmed appointments per day**
-
-```{r appointments_per_day}
-barplot(table(appData$AppointmentDay))
-```
 
 ## Splitting the data into Train, Validation & Test
 
-The splitting criterion is using by `AppointmentDay` in the following way:
+In order to construct the model, the data is split in three sets 
+using by the feature `AppointmentDay`, which indicated the day that the
+appointment takes place, in the following way:
 
 * the first 14 days of data go for training
 * the next 7 days for validation
 * the final 6 days for testing
 
-This results in the following sizes for each set.
+This criteria is sustained in the fact that number of planned appointments per
+day is reasonably uniform (save for one particular date).
+
+```{r appointments_per_day}
+barplot(table(appData$AppointmentDay), ylab="count", xlab="date")
+title(main="Number of appointments per day")
+```
+
+The following graph shows the resulting partition sizes:
 
 ```{r samples_split, cache=TRUE}
 train <- appData[appData$AppointmentDay <= "2016-05-17",]
@@ -230,11 +238,14 @@ barplot(sapply(list(range(train$Wait)
 
 ## Evaluation Criteria
 
-Log loss. Because calibrated probabilities could prove useful. Think appointment
-superposition. Policies can be based on probabilities.
+Finding the final model involves training models with different complexities and
+picking the one that best generalizes to unseen data.
+
+The [cross entropy](https://en.wikipedia.org/wiki/Cross_entropy), *a.k.a* log loss,
+is the measure used to pick the wining model. This error measure favors models
+that produce accurate probabilities.
 
 ## Learning Curve
-
 
 ```{r train_tree_model, results="hide", cache=TRUE}
 
@@ -277,7 +288,7 @@ An important question is *whether there is enough data to train a model*.
 Complex models being, generally more data demanding than simpler ones. The
 common procedure to answer this question is using a *learning curve*.
 
-In a learning curve, increasing amounts of data is used to train the model while
+In a learning curve, an increasing amount of data is used to train the model while
 observing its performance on a validation set. This is a diminishing returns
 scenario where doubling the amount of data won't generally double the model's
 performance. Models reach a, practically, maximum performance after which
@@ -306,7 +317,7 @@ legend("bottomright", title="Performance", pch=c(4,1),
 
 The performance in the validation set shows the diminishing returns of using more
 data, but it seems the limit has not been reached yet after spending
-all the available data. It also shows that for small number of samples, the
+all the available data. It also shows, as it is expected, that for small number of samples, the
 training and validation errors differ substantially.
 
 One peculiarity in this analysis is that the training
@@ -325,7 +336,7 @@ Lower depths mean simpler to interpret models, so they are preferred. This
 analysis trains trees of up to a depth of 8. The validation set is used,
 afterwards, to pick the simpler one with the least error.
 
-```{r validation_curve}
+```{r validation_curve, cache=TRUE}
 picked_training_size <- which.min(best_val_perf) #an index in the larning_curve
 plot(seq(8), learning_curve[[picked_training_size]]$loss[2,]
      , xlab="Tree depth", ylab="Performance in Validation Set"
@@ -350,7 +361,7 @@ treeModel <- ctree(No.show ~ Wait + SMS_received + Age + Scholarship + Gender,
 					 maxdepth=picked_tree_depth))
 ```
 
-```{r base_line}
+```{r base_line, cache=TRUE}
 pred_test <- unlist(lapply(treeresponse(treeModel, newdata=test),FUN=`[`,2))
 ground_trurh_test <- ((as.integer(test[, "No.show"])+1)%%2)
 ground_trurh_train <- ((as.integer(rbind(train,validation)[, "No.show"])+1)%%2)
@@ -359,17 +370,17 @@ logLoss(ground_trurh_test, mean(ground_trurh_train))
 ```
 
 Its performance is evaluated using a test set. In this case, the model has
-*logloss* of `0.4267598` in the test set.
+*log loss* of `0.4267598` in the test set.
 
 **Comparison with the baseline performance**
 
-The baseline model, in this case, in one that assigns to each patient a
-probability $p$ of missing the appointment. Where $p$ is the ratio between
+The baseline model, in this case, is one that assigns to all patients a
+the same probability $p$ of missing the appointment. This $p$ is the ratio between
 those who didn't showed up and the total amount of patients.
 
-Such a basic model has a logloss of `0.4798831` in the test set, which is
+Such a basic model has a log loss of `0.4798831` in the test set, which is
 greater than that of the tree model. This means that the tree model has
-succeed in find populations with markedly different probabilities of showing up.
+succeed in finding populations with markedly different probabilities of showing up.
 
 ### Calibration in the test set
 
@@ -378,8 +389,8 @@ classification, is to check whether the probabilities predicted by the model are
 in tune(or calibrated) with those of the population it represents.
 
 This is evaluated using a calibration curve, where the probabilities predicted
-by the model are compared against the actual ratios seen in the test set. A
-reference $y=x$ line is included for reference.
+by the model are compared against the actual ratios seen in the test set. The
+ideal `Test ratio = estimated probability` line is included for reference.
 
 ```{r calibration_curve_test, cache=TRUE}
 pred_test <- unlist(lapply(treeresponse(treeModel, newdata=test),FUN=`[`,2))
@@ -390,7 +401,6 @@ deviation_test <- lapply(split(ground_trurh_test, as.factor(pred_test)), FUN=fun
 				  m<- mean(d)
 				  return(m*(1-m)/length(d))})
 
-range(deviation_test)
 
 plot(as.numeric(names(calibration_test)), calibration_test
      ,xlab="Estimated probability"
@@ -404,8 +414,15 @@ probability of patients missing their appointments. However, this is not enough
 to prevent the extraction of valuable insights from the model as the next
 section shows.
 
-
 ## Apendix
 
-The desviation is calculated as the posterior variance of beta bernoulli
-distribution in the limit where the amount of data overhelms the prior.
+The deviation of the ratio in the test set is calculated as the posterior
+variance of beta bernoulli distribution in the limit where the amount of data
+overhelms the prior.
+
+The magnitudes are in the order of $10^{-4}$ and are thus omitted in the calibration
+curve.
+
+```{r test_ratio_deviations}
+range(deviation_test)
+```
