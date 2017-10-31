@@ -110,6 +110,16 @@ eda$range_scheduledDay <- range( appData$ScheduledDay ) #"2015-11-10" "2016-06-0
 eda$range_appointmentDay <- range( appData$AppointmentDay ) #"2016-04-29" "2016-06-08"
 ```
 
+The data contains:
+
+* describes `r format(eda$n_samples, big.mark=" ", scientific=FALSE)` appointments.
+* Made by `r format(eda$n_patients , big.mark=" ", scientific=FALSE)` patients.
+* The appointments took place in `r eda$n_neighbourhoods` different
+  neighbourhoods.
+* Appointments where made from `r paste(as.character(eda$range_scheduledDay), collapse=" to ")`.
+* And their dates ranged from `r paste(as.character(eda$range_appointmentDay), collapse=" to ")`.
+* The waiting times being from `r paste(as.character(eda$range_wait), collapse=" to ")` days.
+
 ## Data composition
 
 First a visualization of the sample's composition. Starting with the proportion

@@ -11,7 +11,6 @@ handicaps the person has.
 
 ## EDA Iteration 2
 
-* decision tree
 * seasonality
 * Information gain per feature.
 * Make better presentation of the data
