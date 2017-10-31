@@ -13,8 +13,6 @@ handicaps the person has.
 
 * seasonality
 * Information gain per feature.
-* Make better presentation of the data
-* Comment the sizes of the data (# of patients, appointments, etc)
 
 ## License
 

@@ -3,21 +3,14 @@ require("dplyr", warn.conflicts=FALSE, quietly = TRUE)
 #options(knitr.package.echo=FALSE)
 #options(knitr.package.dev=c("svg"))
 ```
-
 # Exploring No Show data
 
-##Context
+This is an exploratory data analysis (EDA), of data descriving medical
+appointments.
 
-From the source:
-
-> A person makes a doctor appointment, receives all the instructions and
-> no-show. Who to blame? 
-
-The objectives of this exploration are:
-First, to visually present the composition of the sample data;
-And second, to show how the appointments' features relate to whether the
-patients will show up nor not.
-
+The objectives are: first, to visually present the structure of the
+sample data; and second, to show how the appointments' features relate
+to whether the patients will show up nor not.
 
 ```{r helper_functions}
 const <- function (v = stop("v not supplied")) {
@@ -40,15 +33,15 @@ appData <-
 		 header=TRUE)
 ```
 
-## Available Features.
+## Medical Appointment Data.
 
-The structure of the data is:
+The appointments' characteristics present in the data are:
 
 ```{r structure}
 str(appData)
 ```
 
-Next are some variables that might require a short explanation:
+Some of them might require a short explanation:
 
 * **ScheduledDay**: The day the appointment was scheduled.
 * **AppointmentDay**: The day of the appointment.
@@ -62,13 +55,13 @@ Next are some variables that might require a short explanation:
 * **No.show**: The value "Yes", means that the person missed the appointment.
   The value "No", means that the person didn't miss the appointment.
 
-## Computing Derived Features.
+### Computing Derived Features.
 
-One of the factors that might be relevant to the turn up ratio is the
+One of the factors that might be relevant to the show up ratio is the
 length of time from the day the appointment was scheduled to the appointment
-itself. Let us, thus, define:
+itself: 
 
-**Wait** as the number of days from the scheduling date to the appointment date.
+**Wait** the number of days from the scheduling date to the appointment date.
 
 ```{r compute_wait, cache=TRUE}
 schedDay <- const (
@@ -87,7 +80,7 @@ appData$ScheduledDay = schedDay()
 appData$AppointmentDay = appDay()
 ```
 
-## Cleaning The Data
+### Removing malformed records.
 
 Some rows with negative `Wait` or `Age` where ignored when performing the
 analysis.
@@ -97,7 +90,14 @@ appData <- appData[appData$Wait>=0,]
 appData <- appData[appData$Age>=0,]
 ```
 
-## Some numbers about the data
+## Exploration
+
+This section contains the actual exploration of the data after having
+established what features are present and removed the malformed records.
+
+### Some numbers
+
+The first set of questions are about quantities. 
 
 ```{r eda}
 eda <- list()
@@ -110,20 +110,18 @@ eda$range_scheduledDay <- range( appData$ScheduledDay ) #"2015-11-10" "2016-06-0
 eda$range_appointmentDay <- range( appData$AppointmentDay ) #"2016-04-29" "2016-06-08"
 ```
 
-The data contains:
+* How many appointments? `r format(eda$n_samples, big.mark=" ", scientific=FALSE)` appointments.
+* How many patients? `r format(eda$n_patients , big.mark=" ", scientific=FALSE)` patients.
+* Where do the appointments take place? In `r eda$n_neighbourhoods` different neighbourhoods.
+* When were the appointments scheduled? From `r paste(as.character(eda$range_scheduledDay), collapse=" to ")`.
+* When was the appointment? From `r paste(as.character(eda$range_appointmentDay), collapse=" to ")`.
+* How many days did the patients had to wait? From `r paste(as.character(eda$range_wait), collapse=" to ")` days.
 
-* describes `r format(eda$n_samples, big.mark=" ", scientific=FALSE)` appointments.
-* Made by `r format(eda$n_patients , big.mark=" ", scientific=FALSE)` patients.
-* The appointments took place in `r eda$n_neighbourhoods` different
-  neighbourhoods.
-* Appointments where made from `r paste(as.character(eda$range_scheduledDay), collapse=" to ")`.
-* And their dates ranged from `r paste(as.character(eda$range_appointmentDay), collapse=" to ")`.
-* The waiting times being from `r paste(as.character(eda$range_wait), collapse=" to ")` days.
+### The target composition.
 
-## Data composition
-
-First a visualization of the sample's composition. Starting with the proportion
-of missed appointments, which is the target of the study.
+Now a visualization of the sample's composition. Starting with the proportion
+of missed appointments, which is the target variable of the study. The data
+shows that most patients don't miss their appointments.
 
 ```{r no_show_distribution}
 middle_points <- table(appData$No.show) %>% barplot(col=c(2,4))
@@ -132,12 +130,21 @@ text(middle_points, y=10000, labels = Vectorize(function(v) { sprintf("%2.0f %%"
 						})(proportions*100))
 legend("topright", title="No.show", fill=c(2,4),
        legend=levels(appData$No.show))
-title(main="Most patients don't miss the appointment")
+title(main="Most patients don't miss their appointments")
 ```
 
-Now, a visualization of the features and how they relate to the target.
+### Features composition.
+
+It is also interesting to visualize the relation between the features and the
+target.
+
+Two questions about the features are explored: what is the feature's
+distribution in the data?; and, what is it relation with the target?
 
 **Gender**
+
+There are almost twice as many women than men.
+Both genders are equally likely to miss their appointments.
 
 ```{r gender_distribution, fig.height=7}
 par(mfrow=c(2,1))
@@ -154,10 +161,13 @@ tbl_gender %>% prop.table(2) %>%
 title("Both genders are equally likely to miss the appointment")
 ```
 
-**Age**
+**Patient's Age**
 
-After the age of 90 years there are only a few samples, so the proportions aren't
-significative.
+The patients' age distribution. The relation with whether they show up or don't
+indicates that patients around the 15-20 age range are slightly more likely to
+miss the appointment.
+
+As expected, there are few samples for very old ages.
 
 ```{r hist_ages_1, fig.show="hide"}
 hist_age<-hist(appData$Age)
@@ -176,8 +186,10 @@ title("Proportion of No.show by age")
 **Waiting Time**
 
 Most appointments are same-day or for the next day. Those
-appointments also have better turn up. *Warning*, the histograms below have
-non-uniform bin sizes.
+appointments also have better turn up. Lower waiting times appear to improve the
+show up ratio.  
+
+*Warning*, the histograms below have non-uniform bin sizes.
 
 ```{r hist_wait, fig.show="hide"}
 hist_wait <- hist(appData$Wait, breaks=Vectorize(function(e) {2**e})(seq(0,8))-1)
@@ -198,6 +210,9 @@ title(main="Lower wait times have better turn up.")
 
 **Distribution of Neighbourhoods**
 
+There is considerable variance in the quantities of patients by neighbourhood,
+but not so in the show up ratio.
+
 ```{r hist_neighbourhood, fig.height=7, cache=TRUE}
 tbl_neigh <- table(appData$No.show, appData$Neighbourhood)
 par(mfrow=c(2,1))
@@ -207,10 +222,17 @@ legend("topleft", title="No.show", fill=c(2,4),
        legend=levels(appData$No.show), cex=0.7, xpd=TRUE)
 barplot(tbl_neigh %>% prop.table(2), col=c(2,4),
 	ylab="Proportion", xlab="Neighbourhood")
-title(main="Most locations have the same turn up ratio")
+title(main="Most locations have the same show up ratio")
 ```
 
 **Distribution of other categorical variables**
+
+Most notably, it appears that patients that received an SMS (`SMS_received == 1`)
+where also less likely to show up.
+
+This is due the fact that patients with same-day appointments don't receive a
+SMS and are, simultaneously the more likely to show up (maybe they already at
+the hospital).
 
 ```{r hists_categorical_variables, results="hide", fig.height=20}
 par(oma = c(0,0,2,0))
@@ -234,13 +256,28 @@ mapply(FUN=function(column,varname) {
 	barplot(prop.table(tbl_var,2), xlab=varname,
 				 ylab="Proportion", col=c(2,4))
 },appData[,8:13], names(appData)[8:13])
-
-
 ```
 
+```{r same_day_sms}
+with(appData %>% filter(Wait == 0), { table(SMS_received) })
+```
 
-The last row of plots suggests that when `SMS_received == 0` the patient is more
-likely to show up. **Thus the `0` might mean that SMS was received**.
+Actually, if we only consider appointments that don't occur the same day,
+patients who received a SMS a bit more likely to show up.
+
+```{r not_same_day_sms}
+with(appData %>% filter(Wait != 0), {
+     par(mfrow=c(1,2), oma = c(0, 0, 2, 0))
+     tbl_var <- table(No.show, SMS_received)
+     middle_points <- barplot(tbl_var, xlab="SMS_received", ylab="Count", col=c(2,4))
+     text(middle_points, y=40000, labels = Vectorize(function(v) { sprintf("%2.0f %%",v)
+						})(100*(table(SMS_received) %>%
+							prop.table %>% c)))
+     barplot(prop.table(tbl_var,2), xlab="SMS_received",
+	     ylab="Proportion", col=c(2,4))
+     mtext("Sending SMS is useful when Wait > 0.", outer = TRUE, cex = 1.5)
+})
+```
 
 ## Some Characteristics
 

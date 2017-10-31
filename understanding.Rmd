@@ -8,6 +8,17 @@ it says whether the patient showed or not. Using the original data nomenclature:
 * `No.show = Yes` means the patient missed the appointment.
 * `No.show = No` means the patient showed up to the appointment.
 
+The appointment's characteristics relevant to this analysis are:
+
+* `Wait`: The number of days the patients had to wait for their appointment.
+* `Age`: patient's age
+* `Gender`: self explanatory
+* `SMS_received`: whether the patient recived an remainder by SMS
+* `Scholarship` : whether the patitent receives economic aid.
+
+The data contains more characteristics about the appointmets, but the variables
+above where the ones that resulted more relevant in this analysis.
+
 The objective is to gain knowledge of what groups of patients are more prone to
 miss their appointments. This knowledge can, in turn, be used to sustain future
 policies or evaluate the effectiveness of current ones.
