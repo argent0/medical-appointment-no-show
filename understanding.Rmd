@@ -1,22 +1,3 @@
-## TODO
-
-* <s>Split the data into a test,validation, train set</s>
-* <s>Train a ctree.</s>
-* <s>Use validation to adjust some parameters.</s>
-* <s>Use test to evaluate the resulting model.</s>
-
-### EDA Feedback
-
-* Make better presentation of the data
-
-### First version TODO
-
-* <s>Write the motivation as a first paragraph.</s>
-* <s>Reintroduce the dataset.</s>
-* <s>Motivate the data splitting (Why do we split? How? What have we obtained?)</s>
-* <s>Motivate the evaluation criteria.</s>
-* Move the new EDA to the EDA post.
-
 # Tree Analysis
 
 This article deals with further analysing the data explored on a previous

@@ -9,11 +9,16 @@ A person makes a doctor appointment and then doesn't show up. What is happening?
 The `handcap` variable is for Handicap. It seems to be the number of total
 handicaps the person has.
 
-## Iteration 2
+## EDA Iteration 2
 
 * decision tree
 * seasonality
 * Information gain per feature.
+* Make better presentation of the data
+
+## Decision Tree TODO
+
+* Move the new EDA to the EDA post.
 
 ## License
 
