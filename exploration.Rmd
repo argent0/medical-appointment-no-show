@@ -97,6 +97,19 @@ appData <- appData[appData$Wait>=0,]
 appData <- appData[appData$Age>=0,]
 ```
 
+## Some numbers about the data
+
+```{r eda}
+eda <- list()
+eda$n_samples <- nrow(appData) #110,521
+eda$n_patients <- length(unique(appData$PatientId)) #62,298
+eda$n_appointments <- length(unique(appData$AppointmentID)) #one row per appointment
+eda$n_neighbourhoods <- nlevels(appData$Neighbourhood) #81
+eda$range_wait <- range( appData$Wait ) # Waits of up to 179 days
+eda$range_scheduledDay <- range( appData$ScheduledDay ) #"2015-11-10" "2016-06-08"
+eda$range_appointmentDay <- range( appData$AppointmentDay ) #"2016-04-29" "2016-06-08"
+```
+
 ## Data composition
 
 First a visualization of the sample's composition. Starting with the proportion
