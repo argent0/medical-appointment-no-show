@@ -1,3 +1,97 @@
+```{r setup, results="hide", echo=FALSE}
+require("functional", warn.conflicts=FALSE, quietly = TRUE)
+require("dplyr", warn.conflicts=FALSE, quietly = TRUE)
+require("party", warn.conflicts=FALSE, quietly = TRUE)
+require("Metrics", warn.conflicts=FALSE, quietly = TRUE)
+options(knitr.package.dev=c("svg"))
+options(knitr.package.echo=FALSE)
+options(knitr.package.fig.path='understanding_fig')
+```
+
+```{r load_data, cache=TRUE}
+#Loading the data
+appData <-
+	read.csv(
+		 unz("data/noshowappointments.zip", "KaggleV2-May-2016.csv"),
+		 header=TRUE)
+
+# Computing the wait
+schedDay <- const (
+	sapply(X = (appData$ScheduledDay %>% as.character %>% strsplit("T")),
+	       FUN=`[[`, 1) %>%
+	strptime("%Y-%m-%d") %>% as.Date)
+
+
+appDay <- const (
+	sapply(X = (appData$AppointmentDay %>% as.character %>% strsplit("T")),
+	       FUN=`[[`, 1) %>%
+	strptime("%Y-%m-%d") %>% as.Date)
+
+appData$Wait= (appDay() - schedDay()) %>% as.numeric #in days
+appData$ScheduledDay = schedDay()
+appData$AppointmentDay = appDay()
+
+# Data clean up
+appData <- appData[appData$Wait>=0,]
+appData <- appData[appData$Age>=0,]
+```
+
+```{r samples_split, cache=TRUE}
+train <- appData[appData$AppointmentDay <= "2016-05-17",]
+validation <- appData[appData$AppointmentDay > "2016-05-17" &
+		appData$AppointmentDay <= "2016-05-31",]
+test <- appData[appData$AppointmentDay > "2016-05-31",]
+```
+
+```{r train_tree_model, results="hide", cache=TRUE}
+
+learning_curve_step <- function(limit_date) {
+	train_set <- train$AppointmentDay <= limit_date
+
+	validation_step <- function(tree_depth) {
+		treeModel <- ctree(No.show ~ Wait + SMS_received + Age + Scholarship + Gender,
+				   data=train,
+				   subset=train_set,
+				   control=ctree_control(mincriterion=0.95,
+							 minbucket=500,
+							 maxdepth=tree_depth))
+
+		# Predict probabilities from the model
+		pred_train <- unlist(lapply(treeresponse(treeModel),FUN=`[`,2))
+		ground_trurh_train <- ((as.integer(train[train_set, "No.show"])+1)%%2)
+
+		loss_train <- logLoss(ground_trurh_train, pred_train)
+
+		pred_validation <- unlist(lapply(treeresponse(treeModel, newdata=validation),FUN=`[`,2))
+		ground_trurh_validation <- ((as.integer(validation[, "No.show"])+1)%%2)
+		loss_validation <- logLoss(ground_trurh_validation, pred_validation)
+		return(c(loss_train, loss_validation))
+	}
+
+	result <- list(n_samples=sum(train_set),
+		       loss=Vectorize(validation_step)(seq(8)))
+
+	print(result)
+	return(result)
+}
+
+learning_curve <- lapply( as.list(sort(unique(train$AppointmentDay))), learning_curve_step)
+
+best_val_perf <- sapply(learning_curve, FUN=function(elm) { return(min(elm$loss[2,])) })
+best_train_perf <- sapply(learning_curve, FUN=function(elm) { return(min(elm$loss[1,])) })
+best_val_tree_size <- sapply(learning_curve, FUN=function(elm) { return(which.min(elm$loss[2,])) })
+best_val_train_size <- sapply(learning_curve, FUN=function(elm) { return(which.min(elm$loss[1,])) })
+```
+
+```{r resulting_model,cache=TRUE}
+picked_tree_depth = 5 # b.c there isn't much difference with 6
+treeModel <- ctree(No.show ~ Wait + SMS_received + Age + Scholarship + Gender,
+		   data=rbind(train, validation),
+		   control=ctree_control(mincriterion=0.95,
+					 minbucket=500,
+					 maxdepth=picked_tree_depth))
+```
+
 # Tree Analysis
 
 This article deals with further analysing the data explored on a previous
@@ -46,7 +140,7 @@ Before entering into technical details, here is the resulting tree model
 * Use <kbd>Ctrl</kbd>&nbsp;<kbd>-</kbd> to downscale.
 * Use <kbd>Ctrl</kbd>&nbsp;<kbd>0</kbd> to return to the default size.
 
-```{r resulting_model_show ,fig.height=15, fig.width=30,cache=TRUE}
+```{r resulting_model_show,fig.height=15, fig.width=30,cache=TRUE}
 plot(treeModel)
 ```
 
@@ -127,42 +221,6 @@ This particular analysis constrains the tree model in two ways:
 Both these constrains will improve the model's performance on unseen data, *e.g.*
 future data.
 
-```{r}
-require("functional")
-require("dplyr")
-require("party")
-require("Metrics")
-options(knitr.package.dev=c("svg"))
-options(knitr.package.echo=FALSE)
-```
-
-```{r load_data, cache=TRUE}
-#Loading the data
-appData <-
-	read.csv(
-		 unz("data/noshowappointments.zip", "KaggleV2-May-2016.csv"),
-		 header=TRUE)
-
-# Computing the wait
-schedDay <- const (
-	sapply(X = (appData$ScheduledDay %>% as.character %>% strsplit("T")),
-	       FUN=`[[`, 1) %>%
-	strptime("%Y-%m-%d") %>% as.Date)
-
-
-appDay <- const (
-	sapply(X = (appData$AppointmentDay %>% as.character %>% strsplit("T")),
-	       FUN=`[[`, 1) %>%
-	strptime("%Y-%m-%d") %>% as.Date)
-
-appData$Wait= (appDay() - schedDay()) %>% as.numeric #in days
-appData$ScheduledDay = schedDay()
-appData$AppointmentDay = appDay()
-
-# Data clean up
-appData <- appData[appData$Wait>=0,]
-appData <- appData[appData$Age>=0,]
-```
 
 ## Splitting the data into Train, Validation & Test
 
@@ -184,12 +242,7 @@ title(main="Number of appointments per day")
 
 The following graph shows the resulting partition sizes:
 
-```{r samples_split, cache=TRUE}
-train <- appData[appData$AppointmentDay <= "2016-05-17",]
-validation <- appData[appData$AppointmentDay > "2016-05-17" &
-		appData$AppointmentDay <= "2016-05-31",]
-test <- appData[appData$AppointmentDay > "2016-05-31",]
-
+```{r sample_split_plot, cahce=TRUE}
 (function(){
 	 nrows <- lapply(list(Train=train,Validation=validation,Test=test), nrow)
 	 midpoints <- barplot(unlist(nrows) , ylab="Number of Rows")
@@ -225,40 +278,6 @@ that produce accurate probabilities.
 
 ## Learning Curve
 
-```{r train_tree_model, results="hide", cache=TRUE}
-
-learning_curve_step <- function(limit_date) {
-	train_set <- train$AppointmentDay <= limit_date
-
-	validation_step <- function(tree_depth) {
-		treeModel <- ctree(No.show ~ Wait + SMS_received + Age + Scholarship + Gender,
-				   data=train,
-				   subset=train_set,
-				   control=ctree_control(mincriterion=0.95,
-							 minbucket=500,
-							 maxdepth=tree_depth))
-
-		# Predict probabilities from the model
-		pred_train <- unlist(lapply(treeresponse(treeModel),FUN=`[`,2))
-		ground_trurh_train <- ((as.integer(train[train_set, "No.show"])+1)%%2)
-
-		loss_train <- logLoss(ground_trurh_train, pred_train)
-
-		pred_validation <- unlist(lapply(treeresponse(treeModel, newdata=validation),FUN=`[`,2))
-		ground_trurh_validation <- ((as.integer(validation[, "No.show"])+1)%%2)
-		loss_validation <- logLoss(ground_trurh_validation, pred_validation)
-		return(c(loss_train, loss_validation))
-	}
-
-	result <- list(n_samples=sum(train_set),
-		       loss=Vectorize(validation_step)(seq(8)))
-
-	print(result)
-	return(result)
-}
-
-learning_curve <- lapply( as.list(sort(unique(train$AppointmentDay))), learning_curve_step)
-```
 
 **Convergence of the algorithm**
 
@@ -276,12 +295,7 @@ with less data than more complex ones.
 This is the learning curve for this analysis:
 
 
-```{r learning_curve}
-best_val_perf <- sapply(learning_curve, FUN=function(elm) { return(min(elm$loss[2,])) })
-best_train_perf <- sapply(learning_curve, FUN=function(elm) { return(min(elm$loss[1,])) })
-best_val_tree_size <- sapply(learning_curve, FUN=function(elm) { return(which.min(elm$loss[2,])) })
-best_val_train_size <- sapply(learning_curve, FUN=function(elm) { return(which.min(elm$loss[1,])) })
-
+```{r learning_curve_plot}
 sample_size <- sapply(learning_curve, FUN=function(elm) {return(elm$n_samples)})
 plot(sample_size, best_val_perf,ylim=range(c(best_val_perf,best_train_perf))
      ,main="Learning curve", xlab="Number of used samples",
@@ -320,7 +334,6 @@ plot(seq(8), learning_curve[[picked_training_size]]$loss[2,]
      , xlab="Tree depth", ylab="Performance in Validation Set"
      , main="Validation curve")
 
-picked_tree_depth = 5 # b.c there isn't much difference with 6
 ```
 
 This curve suggests that a tree of depth 5 is enough for the available amount of
@@ -331,13 +344,6 @@ data.
 The final model, a tree with depth 5, is trained in both validation and training
 set. 
 
-```{r resulting_model, cache=TRUE}
-treeModel <- ctree(No.show ~ Wait + SMS_received + Age + Scholarship + Gender,
-		   data=rbind(train, validation),
-		   control=ctree_control(mincriterion=0.95,
-					 minbucket=500,
-					 maxdepth=picked_tree_depth))
-```
 
 ```{r base_line, cache=TRUE}
 pred_test <- unlist(lapply(treeresponse(treeModel, newdata=test),FUN=`[`,2))
@@ -400,7 +406,3 @@ overhelms the prior.
 
 The magnitudes are in the order of $10^{-4}$ and are thus omitted in the calibration
 curve.
-
-```{r test_ratio_deviations}
-range(deviation_test)
-```
