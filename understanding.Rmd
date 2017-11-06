@@ -393,16 +393,15 @@ plot(as.numeric(names(calibration_test)), calibration_test
 abline(0,1,lty=2)
 ```
 
-The plot shows that the model generally tends to slightly underestimate the
+The plot shows that the model generally tends to slightly overestimate the
 probability of patients missing their appointments. However, this is not enough
-to prevent the extraction of valuable insights from the model as the next
-section shows.
+to prevent the extraction of valuable insights.
 
-## Apendix
+## Appendix
 
 The deviation of the ratio in the test set is calculated as the posterior
-variance of beta bernoulli distribution in the limit where the amount of data
-overhelms the prior.
+variance of beta Bernoulli distribution in the limit where the amount of data
+overwhelms the prior.
 
 The magnitudes are in the order of $10^{-4}$ and are thus omitted in the calibration
 curve.
