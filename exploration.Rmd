@@ -5,7 +5,7 @@ require("dplyr", warn.conflicts=FALSE, quietly = TRUE)
 ```
 # Exploring No Show data
 
-This is an exploratory data analysis (EDA), of data descriving medical
+This is an exploratory data analysis (EDA), of data describing medical
 appointments.
 
 The objectives are: first, to visually present the structure of the
@@ -258,7 +258,7 @@ mapply(FUN=function(column,varname) {
 },appData[,8:13], names(appData)[8:13])
 ```
 
-```{r same_day_sms}
+```{r same_day_sms, results="hide"}
 with(appData %>% filter(Wait == 0), { table(SMS_received) })
 ```
 
@@ -296,7 +296,7 @@ ordAppData %>% group_by(PatientId, AppointmentDay) %>%
 next?**
 
 Patients that showed up for their previous appointment are more
-likely to show up again.
+likely to show up again. This is considering appointments on different days.
 
 ```{r previous_appointment, cache=TRUE}
 last_outcome <- ordAppData %>% group_by(PatientId, AppointmentDay) %>%
@@ -311,7 +311,7 @@ nextVsPrev <- const %$% table(ordAppDataWithLastOutcome$No.show,
 
 par(mfrow=c(1,2), oma = c(0, 0, 2, 0))
 middle_points <- nextVsPrev() %>%
- 	barplot(xlab="Previos No.show", ylab="count",
+ 	barplot(xlab="Previous No.show", ylab="count",
 		 names.arg=c("No", "Yes", "NA"), col=c("red","blue"))
 text(middle_points, y=20000, labels =
      Vectorize(function(v) { sprintf("%2.0f %%",v) })(
@@ -319,7 +319,7 @@ text(middle_points, y=20000, labels =
 legend(x=0.5,y=60000, title="No.show", fill=c("red","blue"),
        legend=levels(appData$No.show))
 nextVsPrev() %>% prop.table(2) %>%
-	barplot(xlab="Previos No.show", ylab="Proportion",
+	barplot(xlab="Previous No.show", ylab="Proportion",
 		names.arg=c("No", "Yes", "NA"), col=c("red","blue"))
 mtext("Next No.show vs previous No.show.", outer = TRUE, cex = 1.5)
 ```
